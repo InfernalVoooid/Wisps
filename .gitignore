@@ -1,0 +1,21 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+*.old
+*.zip
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Internal workspace & agent metadata
+*Ex2.md
+.agents/
+.gemini/
+.claude/
+*.tmp

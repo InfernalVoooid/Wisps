@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Базовые свойства сборки определены в Directory.Build.props -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GameHelperDir Condition="'$(GameHelperDir)' == '' and Exists('..\..\API Framework\GameHelper\GameHelper.dll')">..\..\API Framework\GameHelper\</GameHelperDir>
+    <GameHelperDir Condition="'$(GameHelperDir)' == '' and Exists('..\..\..\GameHelper.dll')">..\..\..\</GameHelperDir>
+    <GameHelperDir Condition="'$(GameHelperDir)' == ''">..\..\API Framework\GameHelper\</GameHelperDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Зависимости ядра GameHelper2 (PoE2). -->
+    <Reference Include="GameHelper">
+      <HintPath>$(GameHelperDir)GameHelper.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GameOffsets">
+      <HintPath>$(GameHelperDir)GameOffsets.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GameHelperDir)Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Версия ImGui.NET согласована с хостом; ExcludeAssets=runtime исключает дублирование DLL. -->
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Localization\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Развёртывание скомпилированного плагина в каталог GameHelper/Plugins/Wisps. -->
+  <Target Name="CopyToGameHelperPlugins" AfterTargets="Build" Condition="Exists('$(GameHelperDir)Plugins')">
+    <PropertyGroup>
+      <_DeployDir>$(GameHelperDir)Plugins\$(TargetName)\</_DeployDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_LocalizationFiles Include="Localization\*.json" />
+    </ItemGroup>
+
+    <!-- Удаление временных файлов предыдущей сборки. -->
+    <Delete Files="$(_DeployDir)$(TargetName)$(TargetExt).old;$(_DeployDir)$(TargetName).pdb.old"
+            ContinueOnError="true" />
+
+    <!-- Очистка бинарников плагина перед развёртыванием. -->
+    <Delete Files="$(_DeployDir)$(TargetName)$(TargetExt);$(_DeployDir)$(TargetName).pdb"
+            ContinueOnError="true" />
+
+    <!-- Ротация заблокированных файлов при запущенном хосте (.dll -> .dll.old). -->
+    <Move SourceFiles="$(_DeployDir)$(TargetName)$(TargetExt)"
+          DestinationFiles="$(_DeployDir)$(TargetName)$(TargetExt).old"
+          Condition="Exists('$(_DeployDir)$(TargetName)$(TargetExt)')" />
+    <Move SourceFiles="$(_DeployDir)$(TargetName).pdb"
+          DestinationFiles="$(_DeployDir)$(TargetName).pdb.old"
+          Condition="Exists('$(_DeployDir)$(TargetName).pdb')" />
+
+    <Copy SourceFiles="$(OutDir)$(TargetName)$(TargetExt);$(OutDir)$(TargetName).pdb"
+          DestinationFolder="$(_DeployDir)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_LocalizationFiles)"
+          DestinationFolder="$(_DeployDir)Localization\"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

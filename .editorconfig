@@ -1,0 +1,7 @@
+root = true
+
+[*.cs]
+csharp_prefer_braces = when_multiline:silent
+# Публичные поля — контракт настроек GameHelper2: ImGui связывается по ref, JSON пишет поля.
+dotnet_diagnostic.CA1051.severity = none
+dotnet_diagnostic.CA1305.severity = suggestion
