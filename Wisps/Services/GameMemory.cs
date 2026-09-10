@@ -6,16 +6,12 @@ using GameHelper.RemoteObjects.UiElement;
 
 namespace Wisps.Services;
 
-/// <summary>
-/// Единственная граница плагина с API GameHelper2: смена версии ядра чинится здесь, а не по всему коду.
-/// </summary>
 internal static class GameMemory
 {
     internal static Rectangle WindowArea => Core.Process.WindowArea;
 
     internal static LargeMapUiElement LargeMap => Core.States.InGameStateObject.GameUi.LargeMap;
 
-    // Карта мира перекрывает большую карту целиком: рисовать поверх неё нечего.
     internal static bool IsWorldMapOpen => Core.States.InGameStateObject.GameUi.WorldMapPanel.IsVisible;
 
     internal static bool TryGetArea(out AreaInstance area)

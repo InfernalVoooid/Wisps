@@ -4,56 +4,31 @@ using Wisps.Navigation;
 
 namespace Wisps.Domain;
 
-// Точка сбора на маршруте: сам висп, к которому идём.
 internal readonly record struct RouteStop(Vector2 Grid, float Height, WispKind Kind);
 
-/// <summary>
-/// Маршрут сбора: подход к началу полосы в обход рельефа и цепочка виспов вдоль неё.
-/// </summary>
-/// <remarks>
-/// Виспы стоят полосами, поэтому маршрут — ломаная по самим виспам, а не круг вокруг них. Перебор
-/// цепочек идёт в фоновом потоке по снятому снимку: поток отрисовки только снимает вход и забирает
-/// готовый результат, считать он не должен ничего.
-/// </remarks>
 internal sealed class WispRoute
 {
     internal const int MaxStops = 48;
     internal const int MaxApproachPoints = 40;
 
-    // Насколько далеко может стоять следующий висп полосы. Больше — маршрут начинает прыгать
-    // между соседними полосами, меньше — рвётся на разрывах.
     private const float ChainStepGrid = 45f;
-
-    // Цена дороги относительно добычи: во сколько клеток обходится один «вес» виспа.
     private const float ApproachScaleGrid = 90f;
-
-    // Скопление важнее близости: маршрут ведёт туда, где виспов много, а не туда, где ближайший.
-    // Плотность считается по ячейкам сетки с суммой по блоку 3x3, поэтому граница ячейки не режет
-    // скопление пополам.
     private const float DensityCellGrid = 30f;
     private const float DensityFactor = 2f;
-
-    // Насколько сильно отстающий ярус может перевесить ведущий в равномерном наборе.
     private const float MaxDeficit = 4f;
 
     private const int SeedCount = 3;
     private const int DirectionsPerSeed = 2;
     private const int MaxCandidates = 16;
-
-    // Точки входа обязаны стоять врозь: три соседних виспа одной полосы дают три одинаковые
-    // цепочки и ни одной альтернативы для сравнения.
     private const float SeedSeparationGrid = ChainStepGrid * 2f;
-
     private const int RebuildIntervalMs = 500;
 
-    // Рисуемое состояние. Принадлежит потоку отрисовки.
     private readonly RouteStop[] stops = new RouteStop[MaxStops];
     private readonly Vector2[] approach = new Vector2[MaxApproachPoints];
     private readonly int[] byKind = new int[WispKinds.Count];
     private int stopCount;
     private int approachCount;
 
-    // Вход фонового счёта. Пишется потоком отрисовки только пока счёт не идёт.
     private readonly float[] tierGain = new float[WispKinds.Count];
     private WispMark[] inputMarks = [];
     private float[] inputCost = [];
@@ -62,7 +37,6 @@ internal sealed class WispRoute
     private KindMask inputVisible;
     private int inputCount;
 
-    // Рабочие буферы фонового счёта.
     private readonly RouteStop[] pendingStops = new RouteStop[MaxStops];
     private readonly RouteStop[] chainStops = new RouteStop[MaxStops];
     private readonly Candidate[] candidates = new Candidate[MaxCandidates];
@@ -109,7 +83,6 @@ internal sealed class WispRoute
         builtMask = -1;
         nextRebuildAtMs = 0;
 
-        // Идущий перебор досчитает в свой буфер, но его результат уже не о том, что показано.
         if (build is not null) discardBuild = true;
     }
 
@@ -140,8 +113,7 @@ internal sealed class WispRoute
             return;
         }
 
-        // Выделенный поток, а не пул: пул каждый кадр нужен ядру фреймворка для параллельного
-        // чтения карты сущностей из потока отрисовки.
+        // LongRunning поток: пул потоков нужен ядру фреймворка для параллельного чтения сущностей.
         build = Task.Factory.StartNew(
             RunBuild,
             CancellationToken.None,
@@ -149,8 +121,6 @@ internal sealed class WispRoute
             TaskScheduler.Default);
     }
 
-    // Снимок входа: дальше фоновый поток не касается ни реестра, ни поля, ни сетки — только
-    // собственных массивов, которые здесь и заполнены.
     private bool Snapshot(WispField wisps, TerrainGrid grid, AreaField field, KindMask visible, bool balanced)
     {
         var marks = wisps.Marks;
@@ -238,9 +208,6 @@ internal sealed class WispRoute
         boost = new float[size];
     }
 
-    // Ценность яруса на эту пересборку. Обычный ход считает по редкости яруса; равномерный
-    // гасит редкость и смотрит на две вещи, которые сама игра и сообщает: чего уже собрано меньше
-    // и чего в зоне меньше — второго не хватит, если разбирать зону подряд.
     private void BuildTierGain(WispField wisps, bool balanced)
     {
         if (!balanced)
@@ -267,7 +234,6 @@ internal sealed class WispRoute
             var available = wisps.CountOf(kind);
             var collected = wisps.CollectedOf(kind);
 
-            // Ярус, которого в зоне нет и не было, в равнении не участвует.
             if (available == 0 && collected == 0)
             {
                 tierGain[i] = 0f;
@@ -289,9 +255,6 @@ internal sealed class WispRoute
 
         var bestValue = 0f;
 
-        // Точка входа обычно стоит в середине полосы, и жадный шаг уводит по ней в одну сторону.
-        // Второй прогон отказывается от первого шага в пользу следующего кандидата и уходит в
-        // другую: без этого половина полосы просто не рассматривается.
         foreach (var seed in seeds)
         {
             for (var direction = 0; direction < DirectionsPerSeed; direction++)
@@ -306,7 +269,6 @@ internal sealed class WispRoute
         }
     }
 
-    // Вес окрестности каждой отметки: сколько добычи стоит вокруг неё, а не в ней одной.
     private void BuildDensity()
     {
         cells.Clear();
@@ -348,8 +310,6 @@ internal sealed class WispRoute
         return weight;
     }
 
-    // Три точки входа вместо одной: у ближайшего виспа и у начала дальней богатой полосы разные
-    // итоги, и сравнить их можно, только собрав обе цепочки.
     private void CollectSeeds()
     {
         seeds.Clear();
@@ -386,7 +346,6 @@ internal sealed class WispRoute
         return false;
     }
 
-    // Жадная цепочка по полосе. Возвращает ценность хода: добыча против пройденного пути.
     private float Chain(int seed, int firstStepChoice)
     {
         Array.Clear(taken, 0, inputCount);
@@ -438,14 +397,10 @@ internal sealed class WispRoute
             bestPrefix = chainCount;
         }
 
-        // Жадный ход под конец уходит в разреженное и тянет вниз всё отношение: оставляем лучший
-        // его отрезок, а не весь пройденный.
         chainCount = bestPrefix;
         return bestScore;
     }
 
-    // Ближайшие невзятые виспы по убыванию выгоды. Проходимость проверяется потом и только для
-    // них: луч по клеткам дороже сравнения расстояний, и платить за него всем подряд незачем.
     private int RankNeighbours(Vector2 from)
     {
         var found = 0;

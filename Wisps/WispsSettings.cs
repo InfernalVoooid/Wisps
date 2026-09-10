@@ -4,7 +4,6 @@ using Wisps.Domain;
 
 namespace Wisps;
 
-// Язык интерфейса плагина. Host — следовать выбору GameHelper.
 public enum PluginLanguage
 {
     Host,
@@ -12,7 +11,6 @@ public enum PluginLanguage
     Russian,
 }
 
-// Угол экрана, к которому прижат худ.
 public enum HudCorner
 {
     TopLeft,
@@ -21,14 +19,12 @@ public enum HudCorner
     BottomRight,
 }
 
-// Ярус виспов глазами оператора: показывать ли его на карте и каким цветом.
 public sealed class WispKindOption
 {
     public bool Show = true;
     public Vector4 Color;
 }
 
-// Плоский DTO настроек плагина для сериализации в JSON и привязки к элементам ImGui.
 public sealed class WispsSettings : IPSettings
 {
     public const float MinMarkerSize = 2f;
@@ -46,8 +42,7 @@ public sealed class WispsSettings : IPSettings
     public bool ShowHud = true;
     public HudCorner Hud = HudCorner.TopLeft;
 
-    // Файл настроек переживает смену версии плагина: недостающие ярусы и пустые цвета
-    // восстанавливаются, иначе отрисовка по индексу яруса падает на первом же кадре.
+    // Восстановление схемы при обновлении структуры конфига.
     public void Normalize()
     {
         if (Kinds.Length != WispKinds.Count)

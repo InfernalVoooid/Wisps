@@ -7,13 +7,6 @@ using Wisps.Services;
 
 namespace Wisps.UI;
 
-/// <summary>
-/// Худ поверх игры: сколько виспов каждого яруса в зоне и сколько уже собрано.
-/// </summary>
-/// <remarks>
-/// Рисуется в фоновый список ImGui без собственного окна — по этому слою нельзя кликнуть,
-/// он не перехватывает ввод и живёт независимо от свёрнутого окна настроек хоста.
-/// </remarks>
 internal static class WispHud
 {
     private const float MarginPx = 18f;
@@ -40,8 +33,6 @@ internal static class WispHud
     private static string evenLine = string.Empty;
     private static int rowCount;
 
-    // Раскладка меряется вместе со строками: CalcTextSize маршалит строку в UTF-8, и делать это
-    // каждый кадр ради ширины колонки, которая меняется раз в несколько секунд, незачем.
     private static float nameColumn;
     private static float countColumn;
     private static float harvestColumn;
@@ -95,7 +86,6 @@ internal static class WispHud
         }
     }
 
-    // Строки пересобираются только по изменившимся числам: иначе худ выделяет мусор каждый кадр.
     private static void Rebuild(WispsSettings settings, WispField wisps, WispRoute haul, WispRoute even, TextCatalog text)
     {
         var mask = settings.VisibleKinds().Bits;
@@ -130,8 +120,6 @@ internal static class WispHud
             LastCounts[i] = count;
             LastHarvested[i] = collected;
 
-            // Ярус попадает в худ, если он показан на карте и хоть как-то встретился в зоне:
-            // строка из нулей не отвечает ни на один вопрос.
             if (!settings.Kinds[i].Show || (count == 0 && collected == 0)) continue;
 
             Names[i] = text.T(info.NameKey, info.NameFallback);

@@ -2,17 +2,9 @@ using Wisps.Domain;
 
 namespace Wisps.Services;
 
-/// <summary>
-/// Литералы, продиктованные игрой: путь сущности виспа и токены его модели.
-/// </summary>
-/// <remarks>
-/// Патч ломает их вместе и правятся они только здесь. Наши пороги, доли и тайминги сюда не
-/// попадают: они не зависят от версии игры.
-/// </remarks>
 internal static class GameLiterals
 {
-    // Все четыре яруса — одна сущность; различает их только загруженная модель:
-    // Metadata/Effects/.../wisp_doodads/wisp_<ярус>_<размер>.ao
+    // Тир виспа определяется только токеном модели в Animated.ModelPath.
     internal const string WispEntityPath = "Metadata/MiscellaneousObjects/Azmeri/AzmeriResourceBase";
 
     private const string WildModel = "wisp_vodoo";

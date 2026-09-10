@@ -2,21 +2,15 @@ using System.Numerics;
 
 namespace Wisps.Domain;
 
-// Ярус азмерийского виспа. Порядок объявления — порядок ценности: на нём стоит вес подсказки
-// и индексация всех таблиц по ярусам.
 internal enum WispKind
 {
     Wild,
     Vivid,
     Primal,
     Sacred,
-
-    // Висп с нераспознанной моделью. Не отбрасывается: новая модель после патча иначе исчезла бы
-    // с карты молча, а так её видно и есть что сообщить.
     Unknown,
 }
 
-// Что мы знаем о ярусе: цвет, каким игра рисует висп, и его вес в подсказке маршрута.
 internal readonly record struct WispKindInfo(
     WispKind Kind,
     float Weight,
@@ -37,7 +31,6 @@ internal static class WispKinds
         new(WispKind.Unknown, 1f, "kind.unknown", "Other", new(0.75f, 0.78f, 0.82f, 0.95f)),
     ];
 
-    // Крупная модель виспа несёт больше заряда, чем малая, — скопление из крупных весит больше.
     internal const float LargeModelFactor = 1.6f;
 
     internal static WispKindInfo Of(WispKind kind) => All[(int)kind];
@@ -47,8 +40,6 @@ internal static class WispKinds
     internal static float SizeFactor(bool isLarge) => isLarge ? LargeModelFactor : 1f;
 }
 
-// Набор ярусов, которые оператор оставил видимыми. Подсказка считается по тому же набору:
-// скрытый ярус не должен тянуть маршрут к себе.
 internal readonly record struct KindMask(int Bits)
 {
     internal bool Has(WispKind kind) => (this.Bits & (1 << (int)kind)) != 0;

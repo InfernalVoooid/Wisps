@@ -3,14 +3,6 @@ using GameHelper.RemoteObjects.States.InGameStateObjects;
 
 namespace Wisps.Navigation;
 
-/// <summary>
-/// Снимок проходимости зоны: массив просветов и его размеры одним значением.
-/// </summary>
-/// <remarks>
-/// Всё, что считает пути, спрашивает проходимость только через снимок. Взятый по значению, он
-/// навсегда связывает массив с его шириной и высотой, поэтому фоновый счёт не может застать
-/// смену зоны на полушаге — с полями объекта такое окно есть между двумя присваиваниями.
-/// </remarks>
 internal readonly record struct Walkability(byte[] Cells, int Width, int Height, int MaxClearance)
 {
     private const int NearestWalkableRadius = 12;
@@ -22,8 +14,7 @@ internal readonly record struct Walkability(byte[] Cells, int Width, int Height,
 
     internal bool IsWalkable(int x, int y) => ClearanceAt(x, y) > 0;
 
-    // Прямая проходимость отрезка по Брезенхэму. Диагональный шаг не срезает угол стены:
-    // нарисованная по такому отрезку линия прошла бы сквозь неё.
+    // Прямая проходимость по Брезенхэму без срезания углов стен.
     internal bool HasClearLine(Vector2 from, Vector2 to)
     {
         if (!IsReady) return false;
@@ -64,8 +55,6 @@ internal readonly record struct Walkability(byte[] Cells, int Width, int Height,
         }
     }
 
-    // Висп и игрок могут стоять на непроходимой клетке (модель шире прохода): волна и отрезки
-    // берут ближайшую проходимую вместо отказа.
     internal bool TryFindNearestWalkable(int x, int y, out int foundX, out int foundY)
     {
         foundX = x;
@@ -94,14 +83,6 @@ internal readonly record struct Walkability(byte[] Cells, int Width, int Height,
     }
 }
 
-/// <summary>
-/// Сетка проходимости текущей зоны, распакованная из <c>GridWalkableData</c>.
-/// </summary>
-/// <remarks>
-/// Игра хранит просвет клетки в 4 битах, по две клетки на байт, строками по <c>BytesPerRow</c>.
-/// Ноль — стена. Распаковка идёт один раз на зону и публикуется новым массивом, поэтому уже
-/// выданный <see cref="Walkability"/> остаётся верным сколько угодно долго.
-/// </remarks>
 internal sealed class TerrainGrid
 {
     private const int TileToGridConversion = 23;
@@ -113,7 +94,6 @@ internal sealed class TerrainGrid
 
     internal bool IsReady => snapshot.IsReady;
 
-    // Растёт при каждой перечитанной сетке: поле расстояний по нему понимает, что устарело.
     internal int Generation { get; private set; }
 
     internal void Sync(AreaInstance area)
@@ -134,7 +114,7 @@ internal sealed class TerrainGrid
 
         var height = data.Length / bytesPerRow;
 
-        // Строка выровнена по байтам, поэтому байтовая ширина — только верхняя граница.
+        // Байт хранит 2 клетки; фактическая ширина ограничена размером тайлов.
         var packedWidth = bytesPerRow * 2;
         var tiledWidth = (int)metadata.TotalTiles.X * TileToGridConversion;
         var width = tiledWidth > 0 ? Math.Min(packedWidth, tiledWidth) : packedWidth;
@@ -142,8 +122,6 @@ internal sealed class TerrainGrid
         snapshot = Decode(data, bytesPerRow, width, height);
     }
 
-    // Освобождает распакованную сетку. Повторный вызов ничего не делает: поколение не должно
-    // расти на каждом кадре с выключенным маршрутом.
     internal void Release()
     {
         if (source.Length == 0 && !snapshot.IsReady) return;

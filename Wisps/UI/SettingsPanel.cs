@@ -6,10 +6,6 @@ using Wisps.Services;
 
 namespace Wisps.UI;
 
-/// <summary>
-/// Вкладка плагина в настройках GameHelper. Показатели зоны сюда не выносятся: окно хоста
-/// свёрнуто во время игры, и живые числа живут в худе.
-/// </summary>
 internal static class SettingsPanel
 {
     private static readonly string[] ShowIds = ["##WispShow0", "##WispShow1", "##WispShow2", "##WispShow3", "##WispShow4"];
@@ -107,8 +103,6 @@ internal static class SettingsPanel
         }
     }
 
-    // Колонка образца цвета встаёт по самому длинному названию яруса: имена приходят из перевода
-    // и на другом языке фиксированный отступ либо рвётся, либо зияет.
     private static void DrawKinds(WispsSettings settings, TextCatalog text)
     {
         var column = 0f;

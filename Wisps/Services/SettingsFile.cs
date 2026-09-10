@@ -2,7 +2,6 @@ using Newtonsoft.Json;
 
 namespace Wisps.Services;
 
-// Чтение и запись настроек без исключений в кадр ImGui.
 internal static class SettingsFile
 {
     internal static WispsSettings Load(string path)

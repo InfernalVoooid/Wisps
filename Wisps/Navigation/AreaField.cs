@@ -2,28 +2,14 @@ using System.Numerics;
 
 namespace Wisps.Navigation;
 
-/// <summary>
-/// Поле стоимости прохода от игрока по достижимой части зоны.
-/// </summary>
-/// <remarks>
-/// Считается волной Дейкстры по сетке проходимости в фоновом потоке и публикуется целиком: поток
-/// отрисовки читает готовое поле, а не наполовину посчитанное. Оно отвечает на два вопроса —
-/// сколько идти до точки и каким путём, — и оба нужны, чтобы подход к полосе обходил рельеф.
-/// </remarks>
 internal sealed class AreaField
 {
     private const float Sqrt2 = 1.41421356f;
     private const float Unreached = float.MaxValue;
-
-    // Прижатый к стене путь читается как проход сквозь неё: узкие клетки дороже широких.
     private const float ClearancePenalty = 2f;
 
-    // Границы волны. Маршрут ведёт к ближайшей стоящей полосе, а не через всю зону, поэтому
-    // считать дальше — платить кадром за то, чего никто не увидит.
     private const int MaxSettledCells = 120_000;
     private const float MaxCost = 320f;
-
-    // Пересчёт привязан к пройденному пути, а не к таймеру: стоя на месте волна не устаревает.
     private const int RebuildIntervalMs = 1200;
     private const float RebuildMoveGrid = 45f;
 
@@ -53,8 +39,6 @@ internal sealed class AreaField
 
     private long nextBuildAtMs;
 
-    // Волна и её буфер. Список задетых клеток избавляет от заливки всей сетки на каждый пересчёт:
-    // платим за то, что реально обошли, а не за размер зоны.
     private sealed class Wave
     {
         internal float[] Cost = [];
@@ -86,25 +70,18 @@ internal sealed class AreaField
 
     internal bool IsReady => front.Width > 0 && front.Cost.Length > 0;
 
-    // Растёт с каждым опубликованным полем: маршрут по нему понимает, что расстояния сменились.
     internal int Revision { get; private set; }
 
-    // Освобождает буферы волны. Повторный вызов ничего не делает: ревизия не должна расти на
-    // каждом кадре с выключенным маршрутом.
     internal void Reset()
     {
         if (front.Cost.Length == 0 && back.Cost.Length == 0 && build is null) return;
 
         front = new Wave();
 
-        // Буфер идущей волны не трогаем — она в него пишет; освободится следующим сбросом.
         if (build is null) back = new Wave();
 
         builtGeneration = -1;
         nextBuildAtMs = 0;
-
-        // Ссылка на идущую волну сохраняется: очередь и буфер у неё одни на класс, и вторая волна
-        // поверх первой их перепишет. Отрицательное поколение — признак «результат выбросить».
         pendingGeneration = -1;
         Revision++;
     }
@@ -120,8 +97,6 @@ internal sealed class AreaField
 
         nextBuildAtMs = nowMs + RebuildIntervalMs;
 
-        // Снимок берётся по значению: массив и его размеры связаны навсегда, и смена зоны под
-        // идущей волной не даст ей прочитать новый массив со старыми размерами.
         var terrain = grid.Snapshot;
         var playerX = (int)MathF.Round(playerGrid.X);
         var playerY = (int)MathF.Round(playerGrid.Y);
@@ -132,8 +107,7 @@ internal sealed class AreaField
         pendingFrom = new Vector2(startX, startY);
         pendingGeneration = grid.Generation;
 
-        // Выделенный поток, а не пул: волна занимает ядро надолго, а пул каждый кадр нужен ядру
-        // фреймворка для параллельного чтения карты сущностей из потока отрисовки.
+        // LongRunning поток: пул потоков нужен ядру хоста для параллельного чтения сущностей.
         build = Task.Factory.StartNew(
             () => Run(terrain, wave, open, startIndex),
             CancellationToken.None,
@@ -175,9 +149,6 @@ internal sealed class AreaField
 
         Smooth(terrain);
 
-        // Волна идёт от игрока, спуск — от цели: точки выкладываются в обратном порядке, чтобы
-        // линия бежала к цели, а не от неё. Не поместившийся путь прореживается с сохранением
-        // обоих концов: обрезанный хвост оставил бы разрыв там, где подход стыкуется с цепочкой.
         var total = trace.Count;
         if (total <= points.Length)
         {
@@ -210,7 +181,6 @@ internal sealed class AreaField
             return;
         }
 
-        // Поле сбросили, пока волна шла: её буфер уже никем не удерживается.
         if (pendingGeneration < 0) return;
 
         (front, back) = (back, front);
@@ -249,8 +219,6 @@ internal sealed class AreaField
         return next != index;
     }
 
-    // Спуск по клеткам даёт лесенку, маршруту нужна линия: каждый раз берём самую дальнюю точку
-    // впереди, которую ещё видно напрямую. Взгляд вперёд ограничен — за него платят лучом по клеткам.
     private void Smooth(in Walkability terrain)
     {
         if (trace.Count < 3) return;
@@ -318,8 +286,7 @@ internal sealed class AreaField
                 var index = (ny * width) + nx;
                 if (cells[index] == 0) continue;
 
-                // Диагональ мимо угла стены: без этого запрета путь просачивается между двумя
-                // клетками, которые сам же обходит.
+                // Запрет срезания диагонали через угол стены.
                 if (dx != 0 && dy != 0 && (cells[(cy * width) + nx] == 0 || cells[(ny * width) + cx] == 0)) continue;
 
                 var tentative = priority + (StepCost[step] * lane);

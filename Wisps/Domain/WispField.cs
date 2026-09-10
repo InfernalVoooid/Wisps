@@ -4,21 +4,11 @@ using System.Runtime.InteropServices;
 
 namespace Wisps.Domain;
 
-/// <summary>
-/// Реестр виспов текущей зоны: и те, что игра показывает сейчас, и те, мимо которых уже прошли.
-/// </summary>
-/// <remarks>
-/// Висп забывается по единственному признаку — игра перестала его подтверждать рядом с игроком.
-/// Дальше сетевого пузыря отсутствие подтверждения не значит ничего: сущность выгружена, а висп
-/// на месте. Эта память и даёт обзор всей зоны вместо одного текущего пузыря.
-/// </remarks>
 internal sealed class WispField
 {
-    // Подтверждение, а не выдержка: IsValid теряет отдельные проходы на разорванном чтении карты
-    // сущностей, и один пропуск исчезновением не считается.
+    // Защита от потери кадра при разорванном чтении сущностей.
     private const int MissedScansBeforeGone = 2;
 
-    // Смещение позиции меньше половины клетки — дрожание чтения, а не переезд виспа.
     private const float PositionEpsilonSq = 0.25f;
 
     private readonly Dictionary<uint, Entry> entries = [];
@@ -39,20 +29,16 @@ internal sealed class WispField
         internal int LastScan;
     }
 
-    // Растёт при любом изменении состава: по нему инвалидируются снимок и подсказка маршрута.
     internal int Version => version;
 
     internal int Total => entries.Count;
 
     internal int CountOf(WispKind kind) => counts[(int)kind];
 
-    // Собрано за зону по ярусам. Единственный источник — исчезновение виспа рядом с игроком:
-    // об этом сообщает сама игра, гадать по расстоянию и таймеру не нужно.
     internal ReadOnlySpan<int> Collected => collected;
 
     internal int CollectedOf(WispKind kind) => collected[(int)kind];
 
-    // Растёт с каждым собранным виспом: по нему пересобираются строки худа.
     internal int HarvestVersion { get; private set; }
 
     internal ReadOnlySpan<WispMark> Marks
@@ -78,9 +64,7 @@ internal sealed class WispField
 
     internal void BeginScan() => scan++;
 
-    // Отмечает уже известный висп живым, не читая его компоненты. У Useless-сущности они всё
-    // равно заморожены, и повторное чтение каждого прохода — чистая трата на горячем пути.
-    // Единственное исключение — нераспознанный ярус: модель могла подгрузиться позже.
+    // Компоненты Useless-сущности заморожены; перечитываем только при Unknown ярусе.
     internal bool TryTouch(uint id)
     {
         ref var entry = ref CollectionsMarshal.GetValueRefOrNullRef(entries, id);
@@ -103,8 +87,6 @@ internal sealed class WispField
             return;
         }
 
-        // Компоненты Useless-сущности перестают обновляться через несколько кадров, поэтому чтения
-        // сходятся к финальному значению — принимаем их, пока сущность жива.
         if (entry.Mark.Kind == kind &&
             entry.Mark.IsLarge == isLarge &&
             Vector2.DistanceSquared(entry.Mark.Grid, grid) <= PositionEpsilonSq)
@@ -122,8 +104,6 @@ internal sealed class WispField
         version++;
     }
 
-    // Убирает виспы, которых игра больше не подтверждает в пределах сетевого пузыря: там, где она
-    // их видит, молчание означает «подобрали».
     internal void ForgetCollected(Vector2 playerGrid, float bubbleGrid)
     {
         var bubbleSq = bubbleGrid * bubbleGrid;

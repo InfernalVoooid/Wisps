@@ -8,7 +8,6 @@ using Wisps.UI;
 
 namespace Wisps;
 
-// Точка входа плагина: собирает виспы текущей зоны, ведёт маршрут по ним и рисует карту и худ.
 public sealed class WispsCore : PCore<WispsSettings>
 {
     private readonly WispField wisps = new();
@@ -49,8 +48,6 @@ public sealed class WispsCore : PCore<WispsSettings>
 
     public override void SaveSettings()
     {
-        // Хост может сохранить настройки плагина, для которого OnEnable ещё не отработал:
-        // пути тогда нет, и писать нечего.
         if (settingsPath.Length == 0) return;
 
         SettingsFile.Save(settingsPath, Settings);
@@ -89,12 +86,8 @@ public sealed class WispsCore : PCore<WispsSettings>
 
         var nowMs = Environment.TickCount64;
 
-        // Сбор идёт всегда, пока плагин включён: карта показывает и то, мимо чего уже прошли,
-        // а собрать это можно только с закрытой картой.
         scanner.Tick(area, playerGrid, nowMs, Settings.DeepAreaScan);
 
-        // Два хода отвечают на разные вопросы и живут раздельно: «где взять больше всего» и
-        // «чем добрать отстающий ярус». Поле расстояний у них общее.
         if (Settings.ShowRoute || Settings.ShowEvenRoute)
         {
             terrain.Sync(area);
@@ -102,7 +95,6 @@ public sealed class WispsCore : PCore<WispsSettings>
         }
         else
         {
-            // Выключенный маршрут не должен держать ни распакованную сетку, ни буферы волны.
             field.Reset();
             terrain.Release();
         }

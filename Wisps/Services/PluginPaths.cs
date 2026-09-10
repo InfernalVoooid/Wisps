@@ -2,13 +2,7 @@ using System.Reflection;
 
 namespace Wisps.Services;
 
-/// <summary>
-/// Пути к ресурсам плагина от физического расположения сборки.
-/// </summary>
-/// <remarks>
-/// Хост отдаёт <c>DllDirectory</c> относительным (<c>Plugins/Wisps</c>): запуск с другим рабочим
-/// каталогом иначе тихо уводит и настройки, и переводы в сторону.
-/// </remarks>
+// Резолв абсолютного пути к сборке, если хост передал относительный DllDirectory.
 internal static class PluginPaths
 {
     internal static string Root(string dllDirectoryFromHost)
