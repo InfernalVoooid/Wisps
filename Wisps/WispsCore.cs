@@ -24,7 +24,7 @@ public sealed class WispsCore : PCore<WispsSettings>
 
     public override string GetDescription() => text.T(
         "plugin.description",
-        "Marks Azmeri wisps on the large map in their own colours and lays a walkable collection route through them.");
+        "Shows Wildwood wisps on the Overlay Map (Tab): every tier in its own colour, plus the walkable route that collects the most of them.");
 
     public override void OnEnable(bool isGameOpened)
     {
@@ -113,6 +113,7 @@ public sealed class WispsCore : PCore<WispsSettings>
             wisps,
             Settings.ShowRoute ? haulRoute : null,
             Settings.ShowEvenRoute ? evenRoute : null,
+            text,
             view,
             playerGrid,
             player.TerrainHeight,

@@ -92,9 +92,11 @@ internal sealed class WispRoute
 
         if (build is not null || nowMs < nextRebuildAtMs) return;
 
+        // Ключ пересборки — маска без топлива и света: их переключение перебор не меняет.
+        var wanted = visible.And(WispKinds.Routable);
         var stale = wisps.Version != builtWispVersion ||
                     field.Revision != builtFieldRevision ||
-                    visible.Bits != builtMask ||
+                    wanted.Bits != builtMask ||
                     balanced != builtBalanced;
 
         if (!stale) return;
@@ -102,10 +104,10 @@ internal sealed class WispRoute
         nextRebuildAtMs = nowMs + RebuildIntervalMs;
         builtWispVersion = wisps.Version;
         builtFieldRevision = field.Revision;
-        builtMask = visible.Bits;
+        builtMask = wanted.Bits;
         builtBalanced = balanced;
 
-        if (!Snapshot(wisps, grid, field, visible, balanced))
+        if (!Snapshot(wisps, grid, field, wanted, balanced))
         {
             stopCount = 0;
             Array.Clear(byKind);
@@ -224,6 +226,8 @@ internal sealed class WispRoute
         var mostAvailable = 0;
         for (var i = 0; i < tierGain.Length; i++)
         {
+            if (!WispKinds.IsRoutable((WispKind)i)) continue;
+
             mostCollected = Math.Max(mostCollected, wisps.CollectedOf((WispKind)i));
             mostAvailable = Math.Max(mostAvailable, wisps.CountOf((WispKind)i));
         }
@@ -234,7 +238,7 @@ internal sealed class WispRoute
             var available = wisps.CountOf(kind);
             var collected = wisps.CollectedOf(kind);
 
-            if (available == 0 && collected == 0)
+            if (!WispKinds.IsRoutable(kind) || (available == 0 && collected == 0))
             {
                 tierGain[i] = 0f;
                 continue;
