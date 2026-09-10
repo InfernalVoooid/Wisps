@@ -17,8 +17,7 @@ internal sealed class WispScanner(WispField wisps)
     private const int MaxDeepRunsPerArea = 16;
     private const float BubbleGrid = AreaInstanceConstants.NETWORK_BUBBLE_RADIUS;
 
-    private readonly Func<string, bool> wispPathFilter =
-        static path => path.StartsWith(GameLiterals.WispEntityPath, StringComparison.Ordinal);
+    private static readonly Func<string, bool> WispPathFilter = GameLiterals.IsWispPath;
 
     private ConcurrentDictionary<uint, WispSighting>? deepSink;
     private Task? deepScan;
@@ -87,10 +86,7 @@ internal sealed class WispScanner(WispField wisps)
         foreach (var pair in area.AwakeEntities)
         {
             var entity = pair.Value;
-            if (!entity.IsValid || !entity.Path.StartsWith(GameLiterals.WispEntityPath, StringComparison.Ordinal))
-            {
-                continue;
-            }
+            if (!entity.IsValid || !GameLiterals.IsWispPath(entity.Path)) continue;
 
             // Компоненты Useless-сущности заморожены; повторно не читаем.
             if (wisps.TryTouch(pair.Key.id) || !TryRead(entity, out var sighting)) continue;
@@ -114,7 +110,7 @@ internal sealed class WispScanner(WispField wisps)
         // LongRunning поток: ReadStdMap fanning out over pool не должен блокировать поток отрисовки хоста.
         deepScan = Task.Factory.StartNew(
             () => area.ScanSleepingEntities(
-                wispPathFilter,
+                WispPathFilter,
                 (key, entity) =>
                 {
                     if (TryRead(entity, out var sighting)) sink[key.id] = sighting;
@@ -165,7 +161,7 @@ internal sealed class WispScanner(WispField wisps)
 
         var model = entity.TryGetComponent<Animated>(out var animated) ? animated.ModelPath : string.Empty;
         sighting = new WispSighting(
-            GameLiterals.ResolveKind(model),
+            GameLiterals.ResolveKind(entity.Path, model),
             grid,
             render.TerrainHeight,
             GameLiterals.IsLargeModel(model));

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using GameHelper.Utils;
 using ImGuiNET;
@@ -8,8 +9,8 @@ namespace Wisps.UI;
 
 internal static class SettingsPanel
 {
-    private static readonly string[] ShowIds = ["##WispShow0", "##WispShow1", "##WispShow2", "##WispShow3", "##WispShow4"];
-    private static readonly string[] ColorIds = ["##WispColor0", "##WispColor1", "##WispColor2", "##WispColor3", "##WispColor4"];
+    private static readonly string[] ShowIds = CreateIds("##WispShow");
+    private static readonly string[] ColorIds = CreateIds("##WispColor");
     private static readonly string[] Names = new string[WispKinds.Count];
     private static readonly string[] LanguageItems = new string[3];
     private static readonly string[] CornerItems = new string[4];
@@ -19,12 +20,19 @@ internal static class SettingsPanel
 
     internal static void Draw(WispsSettings settings, WispScanner scanner, TextCatalog text)
     {
-        ImGui.TextWrapped(text.T("settings.intro", "Marks Azmeri wisps on the large map (Tab) in their own colours."));
-
         DrawLanguage(settings, text);
 
+        var column = MeasureKindColumn(text);
+
         ImGui.SeparatorText(text.T("settings.kinds", "Wisp tiers"));
-        DrawKinds(settings, text);
+        DrawKinds(settings, column, routable: true);
+
+        ImGui.SeparatorText(text.T("settings.landmarks", "Fuel and light"));
+        ImGuiHelper.ToolTip(text.T(
+            "settings.landmarks.tooltip",
+            "These two are not loot, so the route never goes through them. On the map each gets a ring around it and " +
+            "its name written above, so the fuel is hard to miss."));
+        DrawKinds(settings, column, routable: false);
 
         if (ImGui.SmallButton(text.Label("settings.restore_colors", "Restore colours", "WispRestoreColors")))
         {
@@ -103,24 +111,42 @@ internal static class SettingsPanel
         }
     }
 
-    private static void DrawKinds(WispsSettings settings, TextCatalog text)
+    private static float MeasureKindColumn(TextCatalog text)
     {
-        var column = 0f;
+        var width = 0f;
         for (var i = 0; i < WispKinds.Count; i++)
         {
             var info = WispKinds.All[i];
             Names[i] = text.T(info.NameKey, info.NameFallback);
-            column = MathF.Max(column, ImGui.CalcTextSize(Names[i]).X);
+            width = MathF.Max(width, ImGui.CalcTextSize(Names[i]).X);
         }
 
         var style = ImGui.GetStyle();
-        column += ImGui.GetFrameHeight() + (style.ItemInnerSpacing.X * 2f) + style.ItemSpacing.X;
+        return width + ImGui.GetFrameHeight() + (style.ItemInnerSpacing.X * 2f) + style.ItemSpacing.X;
+    }
 
+    // Unknown остаётся сторожем на случай переименованной модели, но настраивать в нём нечего.
+    private static void DrawKinds(WispsSettings settings, float column, bool routable)
+    {
         for (var i = 0; i < WispKinds.Count; i++)
         {
+            var info = WispKinds.All[i];
+            if (info.Routable != routable || info.Kind == WispKind.Unknown) continue;
+
             ImGui.Checkbox(Names[i] + ShowIds[i], ref settings.Kinds[i].Show);
             ImGui.SameLine(column);
             ImGui.ColorEdit4(ColorIds[i], ref settings.Kinds[i].Color, SwatchFlags);
         }
+    }
+
+    private static string[] CreateIds(string prefix)
+    {
+        var ids = new string[WispKinds.Count];
+        for (var i = 0; i < ids.Length; i++)
+        {
+            ids[i] = prefix + i.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return ids;
     }
 }
